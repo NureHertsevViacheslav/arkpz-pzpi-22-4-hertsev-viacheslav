@@ -1,1 +1,108 @@
+//Код до рефакторингу:
+void calculateTotalPrice() {
+    int total = 0;
+    for (int i = 0; i < itemsCount; i++) {
+        total += items[i].price * items[i].quantity;
+    }
+    printf("Total price: %d\n", total);
+}
+//Код після рефакторингу:
+int calculateItemTotalPrice(Item item) {
+    return item.price * item.quantity;
+}
 
+void calculateTotalPrice() {
+    int total = 0;
+    for (int i = 0; i < itemsCount; i++) {
+        total += calculateItemTotalPrice(items[i]);
+    }
+    printf("Total price: %d\n", total);
+}
+
+
+//Код до рефакторингу:
+int x = 10; // кількість товарів
+int y = 50; // ціна товару
+int z = x * y;
+printf("Сума: %d\n", z);
+
+//Код після рефакторингу:
+int itemCount = 10; 
+int itemPrice = 50; 
+int totalCost = itemCount * itemPrice;
+printf("Сума: %d\n", totalCost);
+
+
+//Код до рефакторингу:
+if (user.role == 1) {
+    printf("Адміністратор\n");
+} else if (user.role == 2) {
+    printf("Менеджер\n");
+} else if (user.role == 3) {
+    printf("Користувач\n");
+} else {
+    printf("Роль невідома\n");
+}
+//Код після рефакторингу:
+void printUserRole(int role) {
+    switch (role) {
+        case 1: printf("Адміністратор\n"); break;
+        case 2: printf("Менеджер\n"); break;
+        case 3: printf("Користувач\n"); break;
+        default: printf("Роль невідома\n");
+    }
+}
+
+//Оригінальний код
+private void OnTriggerEnter2D(Collider2D collision)
+{
+    // Check if the collision is happening with a game object with "ground" tag.
+    if (collision.gameObject.tag == "ground")
+    {
+        grounded = true;
+    }
+    else if (collision.gameObject.tag == "block")
+    {
+        grounded = true;
+    }
+    else if (collision.gameObject.tag == "Enemy")
+    {
+        SceneManager.LoadScene(0);
+    }
+    else if (collision.gameObject.tag == "Exit")
+    {
+        thx.SetActive(true);
+    }
+}
+//Код після рефакторингу:
+private void OnTriggerEnter2D(Collider2D collision)
+{
+    string tag = collision.gameObject.tag;
+
+    if (IsGroundTag(tag))
+    {
+        grounded = true;
+    }
+    else if (tag == "Enemy")
+    {
+        HandleEnemyCollision();
+    }
+    else if (tag == "Exit")
+    {
+        HandleExitCollision();
+    }
+}
+private bool IsGroundTag(string tag)
+{
+    return tag == "ground" || tag == "block";
+}
+
+private void HandleEnemyCollision()
+{
+    SceneManager.LoadScene(0);
+}
+
+private void HandleExitCollision()
+{
+    thx.SetActive(true);
+}
