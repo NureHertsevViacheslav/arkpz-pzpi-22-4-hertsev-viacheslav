@@ -1,1 +1,273 @@
+Харківський університет радіоелектроніки 
+Факультет комп'ютерних наук 
+Кафедра програмної інженерії 
+ЗВІТ 
+до лабораторної роботи з дисципліни 
+"Аналіз та рефакторинг коду" 
+на тему: "РОЗРОБКА БІЗНЕС-ЛОГІКИ ТА ФУНКЦІЙ АДМІНІСТРУВАННЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ"
+Виконав ст. гр ПЗПІ-22-4 
+ Герцев В’ячеслав Андрійович
+Перевірив 
+ст. викл. кафедри ПІ
+Сокорчук Ігор Петрович 
 
+
+
+
+
+
+Харків 2024
+________________
+Мета: на лабораторній роботі №3 потрібно розробити бізнес-логику та функції адміністрування серверної частини  програмної системи 
+
+
+Хід роботи
+1. Розробити бізнес логіку серверної частини програмної системи.
+Користувачі:
+* Отримати список користувачів: операція для отримання даних про всіх користувачів.
+* Додати нового користувача: створення нового користувача з перевіркою введених даних (ім'я, електронна пошта, пароль, роль).
+* Видалити користувача: видалення користувача за ID.
+Кімнати:
+* Отримати доступні кімнати: отримання списку кімнат з можливістю фільтрації за параметрами (ємність, обладнання).
+Бронювання:
+* Створити бронювання: операція бронювання кімнати для користувача з перевіркою на конфлікти в часі.
+Аналіз та статистика:
+* Статистика використання кімнат: операція для отримання статистики по кількості бронювань за кожною кімнатою.
+* Аналіз тенденцій: аналіз змін кількості бронювань по місяцях.
+2. Розробити функції адміністрування серверної частини програмної системи.
+Перевірка статусу сервера: перевірка поточного стану серверу та часу його роботи.
+Видалення користувача: операція для видалення користувача за ID.
+Дашборд адміністратора: статистика щодо використання кімнат і активності користувачів.
+Аналіз тенденцій бронювань: статистика по бронюванням за певні періоди для аналізу змін.
+3. Створити програмну реалізацію бізнес логіки та функцій адміністрування серверної частини.
+Користувачі
+// Отримати список користувачів
+router.get('/users', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT UserID, Username, Email, Role FROM Users');
+        res.status(200).json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching users:', err);
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+
+// Додати нового користувача
+router.post('/users', async (req, res) => {
+    const { username, email, password, role } = req.body;
+
+
+    if (!username || !email || !password || !role) {
+        return res.status(400).json({ error: 'All fields are required: username, passwordHash, email, role' });
+    }
+
+
+    if (!['Admin', 'Employee'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+    }
+
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('username', sql.NVarChar, username)
+            .input('email', sql.NVarChar, email)
+            .input('passwordHash', sql.NVarChar, password)
+            .input('role', sql.NVarChar, role)
+            .query('INSERT INTO Users (Username, Email, PasswordHash, Role) VALUES (@username, @email, @passwordHash, @role)');
+        res.status(201).json({ message: 'User added successfully' });
+    } catch (err) {
+        console.error('Error adding user:', err);
+        res.status(500).json({ error: 'Failed to add user' });
+    }
+});
+Кімнати
+// Отримати доступні кімнати з фільтрацією
+router.get('/rooms', async (req, res) => {
+    const { capacity, equipment } = req.query;
+    try {
+        const pool = await poolPromise;
+        let query = 'SELECT * FROM Rooms WHERE 1=1';
+        if (capacity) query += ' AND Capacity >= @capacity';
+        if (equipment) query += ' AND Equipment LIKE @equipment';
+        
+        const request = pool.request();
+        if (capacity) request.input('capacity', sql.Int, capacity);
+        if (equipment) request.input('equipment', sql.NVarChar, `%${equipment}%`);
+
+
+        const result = await request.query(query);
+        res.status(200).json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching rooms:', err);
+        res.status(500).json({ error: 'Failed to fetch rooms' });
+    }
+});
+Бронювання
+// Створити бронювання
+router.post('/bookings', async (req, res) => {
+    const { userId, roomId, startTime, endTime } = req.body;
+    try {
+        const pool = await poolPromise;
+
+
+        // Перевірка на конфлікти
+        const conflictQuery = `
+            SELECT * FROM Bookings
+            WHERE RoomID = @roomId AND 
+            ((@startTime BETWEEN StartTime AND EndTime) OR 
+            (@endTime BETWEEN StartTime AND EndTime) OR 
+            (StartTime BETWEEN @startTime AND @endTime))
+        `;
+        const conflictCheck = await pool.request()
+            .input('roomId', sql.Int, roomId)
+            .input('startTime', sql.DateTime, startTime)
+            .input('endTime', sql.DateTime, endTime)
+            .query(conflictQuery);
+
+
+        if (conflictCheck.recordset.length > 0) {
+            return res.status(409).json({ error: 'Room is already booked during the selected time' });
+        }
+
+
+        // Вставка бронювання
+        const insertQuery = `
+            INSERT INTO Bookings (UserID, RoomID, StartTime, EndTime)
+            VALUES (@userId, @roomId, @startTime, @endTime)
+        `;
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('roomId', sql.Int, roomId)
+            .input('startTime', sql.DateTime, startTime)
+            .input('endTime', sql.DateTime, endTime)
+            .query(insertQuery);
+
+
+        res.status(201).json({ message: 'Booking created successfully' });
+    } catch (err) {
+        console.error('Error creating booking:', err);
+        res.status(500).json({ error: 'Failed to create booking' });
+    }
+});
+Перевірка статусу сервера
+// Перевірка статусу сервера
+router.get('/admin/status', (req, res) => {
+    res.status(200).json({ status: 'Server is running', uptime: process.uptime() });
+});
+Видалення користувача
+// Видалити користувача (адміністрування)
+router.delete('/admin/users/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Users WHERE UserID = @id');
+
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+
+        res.status(200).json({ message: 'User deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting user:', err);
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+Дашборд адміністратора
+// Дашборд адміністратора
+router.get('/admin/dashboard', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+
+
+        const roomUsageQuery = `
+            SELECT RoomID, COUNT(*) AS BookingCount
+            FROM Bookings
+            GROUP BY RoomID
+        `;
+        const usageStats = await pool.request().query(roomUsageQuery);
+
+
+        res.status(200).json({ roomUsage: usageStats.recordset });
+    } catch (err) {
+        console.error('Error fetching admin stats:', err);
+        res.status(500).json({ error: 'Failed to fetch admin statistics' });
+    }
+});
+Аналіз тенденцій бронювань
+// Аналіз тенденцій бронювань
+router.get('/admin/analytics/trends', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const trendsQuery = `
+            SELECT FORMAT(StartTime, 'yyyy-MM') AS Month, COUNT(*) AS TotalBookings
+            FROM Bookings
+            GROUP BY FORMAT(StartTime, 'yyyy-MM')
+            ORDER BY Month
+        `;
+        const trends = await pool.request().query(trendsQuery);
+        res.status(200).json(trends.recordset);
+    } catch (err) {
+        console.error('Error fetching booking trends:', err);
+        res.status(500).json({ error: 'Failed to fetch booking trends' });
+    }
+});
+
+
+4. Перевірити роботу серверної частини системи.
+Приклад тестів
+// Тест на додавання користувача
+describe('POST /api/users', () => {
+    it('додає нового користувача та повертає статус 201', async () => {
+        const newUser = { username: 'JohasdnDoe', email: 'johasn.asdoe@example.com', password: 'password123', role: 'Employee' };
+        const response = await request(app)
+            .post('/api/users')
+            .send(newUser);
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('message', 'User added successfully');
+    });
+
+
+    it('повертає помилку 400, якщо дані неповні', async () => {
+        const newUser = { username: 'JohnDoe', email: 'john.doe@example.com' }; // Відсутній пароль
+        const response = await request(app)
+            .post('/api/users')
+            .send(newUser);
+        expect(response.status).toBe(400);
+        expect(response.body).toHaveProperty('error', 'All fields are required: username, passwordHash, email, role');
+    });
+});
+
+
+// Тест на видалення користувача
+describe('DELETE /api/admin/users/:id', () => {
+    it('видаляє користувача за ID та повертає статус 200', async () => {
+        const userId = 37 // Тестовий ID
+        const response = await request(app).delete(`/api/admin/users/${userId}`);
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('message', 'User deleted successfully');
+    });
+
+
+    it('повертає помилку 404, якщо користувач не знайдений', async () => {
+        const userId = 999; // ID, якого немає в БД
+        const response = await request(app).delete(`/api/admin/users/${userId}`);
+        expect(response.status).toBe(404);
+        expect(response.body).toHaveProperty('error', 'User not found');
+    });
+});
+  
+
+
+
+________________
+
+
+Додаток А
+Посилання на відеозапис - https://youtu.be/CEOPn0LyuP8
