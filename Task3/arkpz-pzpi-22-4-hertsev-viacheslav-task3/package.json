@@ -1,0 +1,29 @@
+{
+    "name": "your-project-name",
+    "version": "1.0.0",
+    "description": "Опис вашого проєкту",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js",
+        "dev": "nodemon app.js",
+        "test": "jest"
+    },
+    "keywords": [
+        "keyword1",
+        "keyword2"
+    ],
+    "author": "Ваше ім'я",
+    "license": "ISC",
+    "dependencies": {
+        "body-parser": "^1.20.3",
+        "express": "^4.21.2",
+        "mssql": "^11.0.1",
+        "swagger-jsdoc": "^6.2.8",
+        "swagger-ui-express": "^5.0.1"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0",
+        "nodemon": "^3.0.0",
+        "supertest": "^7.0.0"
+    }
+}
