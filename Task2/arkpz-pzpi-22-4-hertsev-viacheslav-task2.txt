@@ -1,1 +1,329 @@
+Харківський університет радіоелектроніки 
+Факультет комп'ютерних наук 
+Кафедра програмної інженерії 
+ЗВІТ 
+до лабораторної роботи з дисципліни 
+"Аналіз та рефакторинг коду" 
+на тему: "РОЗРОБКА БАЗИ ДАНИХ ДЛЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ ТА ПРИКЛАДНОГО ПРОГРАМНОГО ІНТЕРФЕЙСУ (API)."
+Виконав ст. гр ПЗПІ-22-4 
+ Герцев В’ячеслав Андрійович
+Перевірив 
+ст. викл. кафедри ПІ
+Сокорчук Ігор Петрович 
 
+
+
+
+
+
+Харків 2024
+________________
+Мета: на лабораторній роботі №2 потрібно розробити базу даних для серверної частини  програмної системи та прикладного програмного інтерфейсу. 
+Хід роботи
+1.  Розробка будови програмної системи
+Для розробки будови програмної системи будемо використовувати багаторівневу архітектуру Client-Server, яка складається з наступних рівнів:
+Клієнтська частина (Front-End)
+* Відповідальна за інтерфейс користувача, де можна переглядати доступність кабінетів, фільтрувати за критеріями (місткість, обладнання) та здійснювати бронювання.
+* Основні технології:
+   * HTML/CSS/JavaScript.
+   * REST API для взаємодії з сервером.
+Серверна частина (Back-End)
+* Основний бізнес-логіка для обробки запитів, управління бронюваннями, авторизацією та взаємодією з БД.
+* Компоненти:
+   * Авторизація та аутентифікація: токен на основі JWT або OAuth2.
+   * Логіка бронювання: забезпечення перевірки доступності кабінетів і синхронізація з календарем.
+   * Валідація даних: перевірка коректності запитів перед обробкою.
+* Технології:
+   * Мова програмування: Node.js.
+   * API: REST.
+База даних (Data Layer)
+* Центральне сховище інформації про користувачів, кабінети, бронювання та корпоративний календар.
+* Типи баз даних:
+   * Реляційна БД: Microsoft SQL.
+   * Підтримка зв'язків між сутностями (ER-діаграма).
+* Основні таблиці:
+   * Users: зберігає дані користувачів.
+   * Rooms: інформація про кабінети.
+   * Bookings: деталі бронювань.
+   * Calendars: синхронізація з корпоративним календарем.
+2.Створити UML діаграму прецедентів для серверної частини системи.
+  
+
+3.Створити ER діаграму даних.
+  
+
+4.Розробити базу даних (БД) програмної системи.
+-- Таблиця користувачів
+CREATE TABLE Users (
+    UserID INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(50) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    Email NVARCHAR(100) NOT NULL UNIQUE,
+    Role NVARCHAR(10) CHECK (Role IN ('Admin', 'Employee')) NOT NULL
+);
+
+
+-- Таблиця кабінетів
+CREATE TABLE Rooms (
+    RoomID INT IDENTITY(1,1) PRIMARY KEY,
+    RoomName NVARCHAR(50) NOT NULL UNIQUE,
+    Capacity INT NOT NULL,
+    Equipment NVARCHAR(255) NOT NULL
+);
+
+
+-- Таблиця бронювань
+CREATE TABLE Bookings (
+    BookingID INT IDENTITY(1,1) PRIMARY KEY,
+    UserID INT NOT NULL,
+    RoomID INT NOT NULL,
+    StartTime DATETIME NOT NULL,
+    EndTime DATETIME NOT NULL,
+    FOREIGN KEY (UserID) REFERENCES Users(UserID) ON DELETE CASCADE,
+    FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID) ON DELETE CASCADE,
+    CHECK (StartTime < EndTime)
+);
+
+
+-- Таблиця для інтеграції з корпоративним календарем
+CREATE TABLE CorporateCalendar (
+    EventID INT IDENTITY(1,1) PRIMARY KEY,
+    RoomID INT NOT NULL,
+    EventStartTime DATETIME NOT NULL,
+    EventEndTime DATETIME NOT NULL,
+    FOREIGN KEY (RoomID) REFERENCES Rooms(RoomID) ON DELETE CASCADE,
+    CHECK (EventStartTime < EventEndTime)
+);
+
+
+-- Попереднє населення таблиць (опціонально)
+INSERT INTO Users (Username, PasswordHash, Email, Role) 
+VALUES ('admin', 'hashed_password', 'admin@example.com', 'Admin');
+
+
+INSERT INTO Rooms (RoomName, Capacity, Equipment) 
+VALUES ('Conference Room 1', 10, 'Projector, Whiteboard'),
+       ('Office Room 101', 4, 'Desk, Chairs'),
+       ('Training Room', 20, 'Projector, Computer, Whiteboard');
+
+
+5.Створити діаграму структури БД.
+  
+
+6.Розробити функції роботи з БД (ORM або CoRM тощо).
+Інтеграція з базою даних:
+* Налаштування підключення до Microsoft SQL Server через бібліотеку mssql у Node.js.
+* Створення конфігураційного файлу для зберігання параметрів підключення, включаючи ім'я сервера, бази даних, ім'я користувача та пароль.
+7.Розробити API (REST або GraphQL, gRPC тощо) для взаємодії серверної частини з клієнтами.
+Реалізація основних функцій: для забезпечення функціональності серверної частини будуть реалізовані такі функції:
+* Отримання даних (READ): функції для отримання даних з таблиць бази даних, таких як список співробітників, доступні кабінети, бронювання тощо.
+* Створення записів (CREATE): функції для додавання нових записів, наприклад, створення нового співробітника або бронювання кабінету.
+* Оновлення записів (UPDATE): функції для оновлення даних, таких як зміна інформації про співробітника або змінення часу бронювання.
+* Видалення записів (DELETE): функції для видалення записів, наприклад, видалення співробітника або скасування бронювання.
+Логування та обробка помилок:
+* Реалізація обробки винятків для гарантування стабільності роботи функцій.
+* Логування помилок у файл або консоль для подальшого аналізу.
+
+
+8.Створити специфікацію розробленого API.
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Employee Management API',
+            version: '1.0.0',
+            description: 'API для управління співробітниками',
+        },
+        servers: [
+            {
+                url: 'http://localhost:3000/api',
+                description: 'Локальний сервер',
+            },
+        ],
+    },
+    apis: ['./routes/*.js'], // Шлях до файлів з документацією
+};
+
+
+9.Створити програмну реалізацію розробленого API та функцій роботи з БД.
+Файл конфігурації бази даних (config/dbConfig.js)
+const sql = require('mssql');
+
+
+// Конфігурація для підключення до бази даних
+const dbConfig = {
+    user: 'your_username',
+    password: 'your_password',
+    server: 'your_server',
+    database: 'your_database',
+    options: {
+        encrypt: true, // Якщо потрібне шифрування
+        trustServerCertificate: true, // Для локального сервера
+    },
+};
+
+
+const poolPromise = new sql.ConnectionPool(dbConfig)
+    .connect()
+    .then((pool) => {
+        console.log('Connected to MSSQL');
+        return pool;
+    })
+    .catch((err) => console.error('Database Connection Failed!', err));
+
+
+module.exports = { sql, poolPromise };
+Логіка роботи з базою даних (services/dbService.js)
+const { sql, poolPromise } = require('../config/dbConfig');
+
+
+// Отримати список співробітників
+async function getEmployees() {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM Employees');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error fetching employees:', err);
+        throw err;
+    }
+}
+
+
+// Додати співробітника
+async function addEmployee(name, email, phoneNumber) {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('Name', sql.NVarChar, name)
+            .input('Email', sql.NVarChar, email)
+            .input('PhoneNumber', sql.NVarChar, phoneNumber)
+            .query(`
+                INSERT INTO Employees (Name, Email, PhoneNumber) 
+                VALUES (@Name, @Email, @PhoneNumber)
+            `);
+        return result.rowsAffected[0];
+    } catch (err) {
+        console.error('Error adding employee:', err);
+        throw err;
+    }
+}
+
+
+module.exports = { getEmployees, addEmployee };
+Маршрути для API (routes/apiRoutes.js)
+const express = require('express');
+const dbService = require('../services/dbService');
+const router = express.Router();
+
+
+// Отримати всіх співробітників
+router.get('/employees', async (req, res) => {
+    try {
+        const employees = await dbService.getEmployees();
+        res.status(200).json(employees);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch employees' });
+    }
+});
+
+
+// Додати співробітника
+router.post('/employees', async (req, res) => {
+    const { name, email, phoneNumber } = req.body;
+    try {
+        const result = await dbService.addEmployee(name, email, phoneNumber);
+        res.status(200).json({ message: `${result} employee(s) added successfully.` });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add employee' });
+    }
+});
+
+
+module.exports = router;
+Головний файл додатка (app.js)
+const express = require('express');
+const bodyParser = require('body-parser');
+const apiRoutes = require('./routes/apiRoutes');
+const { swaggerDocs, swaggerUi } = require('./swaggerConfig');
+
+
+const app = express();
+const PORT = 3000;
+
+
+app.use(bodyParser.json());
+app.use('/api', apiRoutes);
+
+
+// Swagger документація
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
+});
+
+
+
+
+10.Перевірити роботу створеного програмного коду серверної частини системи.
+Для цього використаємо Jest.
+const request = require('supertest');
+const app = require('../app'); // Підключаємо ваш додаток Express
+
+
+describe('API Tests', () => {
+
+
+  // Тест для отримання списку співробітників
+  it('should return a list of employees', async () => {
+    const response = await request(app).get('/api/employees');
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body)).toBe(true); // Перевірка, що відповідь є масивом
+  });
+
+
+  // Тест для додавання нового співробітника
+  it('should add a new employee', async () => {
+    const newEmployee = {
+      name: 'John Doe',
+      email: 'john.doe@example.com',
+      phoneNumber: '123-456-7890'
+    };
+
+
+    const response = await request(app)
+      .post('/api/employees')
+      .send(newEmployee);
+
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toContain('employee(s) added successfully');
+  });
+
+
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Додаток А
+Посилання на відеозапис - https://youtu.be/wxSwzNszX5g
